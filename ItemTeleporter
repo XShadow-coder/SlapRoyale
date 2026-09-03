@@ -135,34 +135,113 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- CONTROLLI DI SICUREZZA (Match & Ragdoll)
+-- SISTEMA STATO MATCH (Logica esatta del detector testato)
+-- ==========================================
+local isMatchReady = false
+local working = false
+local busDetected = false
+local gliderDetected = false
+local freefallDetected = false
+local cycleId = 0
+
+local function resetMatchState()
+    isMatchReady = false
+    working = false
+    busDetected = false
+    gliderDetected = false
+    freefallDetected = false
+    cycleId = cycleId + 1
+end
+
+player.CharacterAdded:Connect(resetMatchState)
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if working then
+            continue
+        end
+
+        local char = player.Character
+        if not char then
+            resetMatchState()
+            continue
+        end
+
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if not humanoid then
+            continue
+        end
+
+        local inBus = char:GetAttribute("InBus")
+        local state = humanoid:GetState()
+        local glider = char:FindFirstChild("Glider")
+
+        -- 6. Quando viene rilevato un nuovo InBus == true dopo isMatchReady, deve essere fatto il reset del ciclo.
+        if isMatchReady then
+            if inBus == true then
+                resetMatchState()
+            end
+            continue
+        end
+
+        -- 1. InBus == true → busDetected = true
+        if inBus == true and not busDetected then
+            busDetected = true
+            gliderDetected = false
+            freefallDetected = false
+        end
+
+        -- 2. InBus == nil + Glider presente → gliderDetected = true
+        if busDetected and inBus == nil and glider and not gliderDetected then
+            gliderDetected = true
+        end
+
+        -- 3. Glider rilevato + HumanoidState == Freefall → freefallDetected = true
+        if gliderDetected and state == Enum.HumanoidStateType.Freefall and not freefallDetected then
+            freefallDetected = true
+        end
+
+        -- 4. freefallDetected + HumanoidState == Running + InBus == nil → attesa di 5 secondi → isMatchReady = true
+        if freefallDetected and state == Enum.HumanoidStateType.Running and inBus == nil then
+            working = true
+            local thisCycle = cycleId
+
+            task.delay(5, function()
+                if thisCycle ~= cycleId then return end
+                isMatchReady = true
+                working = false
+            end)
+
+            continue
+        end
+
+        -- 5. Se non viene rilevato alcun bus/glider loop e siamo già in Running + InBus == nil → attesa di 0.5 secondi → isMatchReady = true
+        if not busDetected and state == Enum.HumanoidStateType.Running and inBus == nil then
+            working = true
+            local thisCycle = cycleId
+
+            task.delay(0.5, function()
+                if thisCycle ~= cycleId then return end
+                isMatchReady = true
+                working = false
+            end)
+        end
+    end
+end)
+
+-- ==========================================
+-- CONTROLLI DI SICUREZZA
 -- ==========================================
 local function checkSafetyConditions(categoryName)
-    -- 1. Controllo inMatch
-    local char = player.Character
-    if char and char:GetAttribute("inMatch") ~= true then
-        -- Aspetta che entri in match
-        while true do
-            char = player.Character
-            if not char then task.wait(0.5); continue end
-            if char:GetAttribute("inMatch") == true then break end
-            
-            -- Se cambia/spegne l'Auto TP interrompi tutto
-            if categoryName and currentAutoTPCategory ~= categoryName then return false end
-            task.wait(0.5)
-        end
-        
-        -- Quando entra in match, aspetta 5 secondi prima di fare tp
-        for i = 1, 25 do -- 5 secondi divisi in check da 0.2
-            if categoryName and currentAutoTPCategory ~= categoryName then return false end
-            task.wait(0.2)
-        end
+    -- 1. Aspetta di essere a terra e fuori dal bus (utilizzando il loop in background)
+    while not isMatchReady do
+        if categoryName and currentAutoTPCategory ~= categoryName then return false end
+        task.wait(0.2)
     end
     
     -- 2. Controllo Ragdolled
-    char = player.Character
+    local char = player.Character
     if char and char:GetAttribute("Ragdolled") == true then
-        -- Aspetta che non sia più ragdollato
         while true do
             char = player.Character
             if not char then task.wait(0.5); continue end
@@ -255,10 +334,10 @@ local function doAutoTP(categoryName)
         task.wait(0.1)
     end
     
-    -- 2. Passa i controlli di sicurezza prima di teletrasportarsi
+    -- 2. Passa i controlli di sicurezza prima di teletrasportarsi (es. in volo o ragdoll)
     if not checkSafetyConditions(categoryName) then return end
 
-    -- 3. Assicurati che l'oggetto esista ancora dopo le lunghe attese
+    -- 3. Assicurati che l'oggetto esista ancora dopo l'attesa
     if not targetItem or not targetItem.Parent or not targetItem:IsDescendantOf(workspaceItems) then
         doAutoTP(categoryName)
         return
@@ -442,7 +521,6 @@ local function addItem(item)
     tpButton.Parent = rowFrame
     Instance.new("UICorner", tpButton).CornerRadius = UDim.new(0, 4)
 
-    -- TP Manuale implementato con gli stessi controlli di sicurezza
     tpButton.MouseButton1Click:Connect(function()
         if not item or not item.Parent then return end
         
@@ -509,4 +587,5 @@ sortCategories()
 workspaceItems.ChildAdded:Connect(function(item)
     addItem(item)
     sortCategories()
+end)
 end)
