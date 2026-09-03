@@ -202,20 +202,8 @@ local function startReadyTimer(delayTime, expectedCycle, expectedCharacter)
     end)
 end
 
-player.CharacterAdded:Connect(function(character)
+player.CharacterAdded:Connect(function()
     resetMatchState()
-
-    task.spawn(function()
-        local humanoid = character:WaitForChild("Humanoid", 5)
-
-        if player.Character ~= character then
-            return
-        end
-
-        if not humanoid then
-            return
-        end
-    end)
 end)
 
 -- ==========================================
