@@ -115,7 +115,7 @@ uiPadding.Parent = scrollFrame
 -- SISTEMA DI COOLDOWN GLOBALE
 -- ==========================================
 local lastTeleportTime = 0
-local COOLDOWN_DURATION = 7
+local COOLDOWN_DURATION = 3
 local currentAutoTPCategory = nil
 
 task.spawn(function()
