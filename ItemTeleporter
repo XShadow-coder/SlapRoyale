@@ -286,7 +286,7 @@ end
             local thisCycle = cycleId
 
             startReadyTimer(
-                5,
+                7,
                 thisCycle,
                 char
             )
