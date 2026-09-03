@@ -1,13 +1,3 @@
-local REQUIRED_PLACE_ID = 9431156611
-
-if game.PlaceId ~= REQUIRED_PLACE_ID then
-    warn("Place ID is invalid! Script not executed.")
-    return
-end
-
-print("Place ID is valid. Loading script...")
-
-
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
@@ -139,9 +129,11 @@ end)
 -- ==========================================
 local isMatchReady = false
 local working = false
+
 local busDetected = false
 local gliderDetected = false
 local freefallDetected = false
+
 local cycleId = 0
 
 local function resetMatchState()
@@ -176,7 +168,7 @@ task.spawn(function()
         local state = humanoid:GetState()
         local glider = char:FindFirstChild("Glider")
 
-        -- 6. Quando viene rilevato un nuovo InBus == true dopo isMatchReady, deve essere fatto il reset del ciclo.
+        -- Quando siamo pronti, se viene rilevato il Bus, il ciclo riparte da capo
         if isMatchReady then
             if inBus == true then
                 resetMatchState()
@@ -184,30 +176,51 @@ task.spawn(function()
             continue
         end
 
-        -- 1. InBus == true → busDetected = true
+        --==================================================
+        -- BUS
+        --==================================================
         if inBus == true and not busDetected then
             busDetected = true
             gliderDetected = false
             freefallDetected = false
         end
 
-        -- 2. InBus == nil + Glider presente → gliderDetected = true
-        if busDetected and inBus == nil and glider and not gliderDetected then
+        --==================================================
+        -- GLIDER
+        --==================================================
+        if busDetected
+            and inBus == nil
+            and glider
+            and not gliderDetected then
+            
             gliderDetected = true
         end
 
-        -- 3. Glider rilevato + HumanoidState == Freefall → freefallDetected = true
-        if gliderDetected and state == Enum.HumanoidStateType.Freefall and not freefallDetected then
+        --==================================================
+        -- FREEFALL
+        --==================================================
+        if gliderDetected
+            and state == Enum.HumanoidStateType.Freefall
+            and not freefallDetected then
+            
             freefallDetected = true
         end
 
-        -- 4. freefallDetected + HumanoidState == Running + InBus == nil → attesa di 5 secondi → isMatchReady = true
-        if freefallDetected and state == Enum.HumanoidStateType.Running and inBus == nil then
+        --==================================================
+        -- RUNNING + INBUS NIL
+        --==================================================
+        if freefallDetected
+            and state == Enum.HumanoidStateType.Running
+            and inBus == nil then
+            
             working = true
             local thisCycle = cycleId
 
             task.delay(5, function()
-                if thisCycle ~= cycleId then return end
+                if thisCycle ~= cycleId then
+                    return
+                end
+                
                 isMatchReady = true
                 working = false
             end)
@@ -215,13 +228,21 @@ task.spawn(function()
             continue
         end
 
-        -- 5. Se non viene rilevato alcun bus/glider loop e siamo già in Running + InBus == nil → attesa di 0.5 secondi → isMatchReady = true
-        if not busDetected and state == Enum.HumanoidStateType.Running and inBus == nil then
+        --==================================================
+        -- NO GLIDER / ALREADY ON GROUND
+        --==================================================
+        if not busDetected
+            and state == Enum.HumanoidStateType.Running
+            and inBus == nil then
+            
             working = true
             local thisCycle = cycleId
 
             task.delay(0.5, function()
-                if thisCycle ~= cycleId then return end
+                if thisCycle ~= cycleId then
+                    return
+                end
+                
                 isMatchReady = true
                 working = false
             end)
@@ -587,5 +608,4 @@ sortCategories()
 workspaceItems.ChildAdded:Connect(function(item)
     addItem(item)
     sortCategories()
-end)
 end)
